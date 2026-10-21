@@ -261,6 +261,15 @@ textarea.in{resize:vertical;min-height:72px}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
         <span class="t">עריכת סיווגים</span>
       </button>
+      <button class="btn" id="btnExport" title="שמירת גיבוי לקובץ">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+        <span class="t">גיבוי</span>
+      </button>
+      <button class="btn" id="btnImport" title="שחזור מקובץ גיבוי">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V4M7 9l5-5 5 5M5 20h14"/></svg>
+        <span class="t">שחזור</span>
+      </button>
+      <input type="file" id="fileImport" accept="application/json,.json" hidden>
       <button class="btn primary" id="btnNew">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         <span class="t">משימה חדשה</span>
@@ -388,6 +397,8 @@ if (!S || !S.fields || !S.tasks) S = seed();
 if (!S.projects) S.projects = [];
 S.tasks.forEach(t => { if (t.project === undefined) t.project = ''; });
 const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+// Ask the browser not to evict our data when storage is low.
+try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch (e) {}
 const ui = {view:'board', q:'', status:'all', f:{}, proj:'', ntype:'', page:'tasks', pid:null};
 const hasFilter = () => !!(ui.q || ui.proj || ui.ntype || ui.status !== 'all' || Object.values(ui.f).some(Boolean));
 const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6-4.5-4.2 6.1-.8z"/></svg>';
@@ -420,6 +431,24 @@ function dueText(due) {
 const fmtTs = ts => new Date(ts).toLocaleString('he-IL', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
 const noteType = id => NOTE_TYPES.find(n => n.id === id) || NOTE_TYPES[0];
 const isLight = c => LIGHT.includes(c);
+$('#btnExport').onclick = () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(S)], {type: 'application/json'}));
+  a.download = 'משימות-גיבוי-' + new Date().toISOString().slice(0, 10) + '.json';
+  a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  toast('הגיבוי נשמר');
+};
+$('#btnImport').onclick = () => $('#fileImport').click();
+$('#fileImport').onchange = e => {
+  const f = e.target.files[0]; e.target.value = '';
+  if (!f) return;
+  f.text().then(txt => {
+    const d = JSON.parse(txt);
+    if (!d || !d.fields || !d.tasks) throw 0;
+    if (!confirm('לשחזר מהגיבוי? המשימות הנוכחיות יוחלפו.')) return;
+    localStorage.setItem(KEY, JSON.stringify(d)); location.reload();
+  }).catch(() => toast('קובץ גיבוי לא תקין'));
+};
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); }
 
 function visible() {
