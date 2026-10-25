@@ -198,6 +198,16 @@ textarea.in{resize:vertical;min-height:72px}
 .fsec .hint{margin-bottom:10px}
 .fgrid{max-width:820px}
 .meta .late{color:#9A6700}
+.g{font-size:.78em;font-weight:500;opacity:.75;margin-inline-start:4px}
+.top .date .g{font-size:.85em}
+.fx{display:flex;gap:8px;margin-top:9px;flex-wrap:wrap}
+.fxb{border:1.5px solid var(--line);background:#fff;border-radius:99px;font-size:13px;font-weight:700;padding:3px 12px;color:var(--ink)}
+.fxb:hover{background:var(--soft)}
+.fxb.on{background:var(--done);border-color:var(--done);color:#fff}
+.card.daydone .ttl{color:var(--muted)}
+.card.daydone{opacity:.8}
+.wrapday{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:14px 0 4px}
+.hebin{color:var(--muted);font-size:14px;font-weight:600;align-self:center}
 /* projects */
 .phd{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:18px 0 16px;flex-wrap:wrap}
 .phd h2{margin:0;font:700 24px/1.1 var(--display)}
@@ -412,15 +422,32 @@ const field = id => S.fields.find(f => f.id === id);
 const optOf = (fid, oid) => (field(fid)?.options || []).find(o => o.id === oid);
 const urgRank = t => { const i = field('urgency').options.findIndex(o => o.id === t.f.urgency); return i < 0 ? 99 : i; };
 const todayStr = () => { const t = new Date(); t.setMinutes(t.getMinutes() - t.getTimezoneOffset()); return t.toISOString().slice(0,10); };
+const GEM_U = ['', 'א', 'ב', 'ג', 'ד', 'ה', 'ו', 'ז', 'ח', 'ט'], GEM_T = ['', 'י', 'כ', 'ל', 'מ', 'נ', 'ס', 'ע', 'פ', 'צ'], GEM_H = ['', 'ק', 'ר', 'ש', 'ת'];
+function gematria(n, thousands) {
+  if (thousands) n %= 1000;
+  let s = '';
+  while (n >= 400) { s += 'ת'; n -= 400; }
+  if (n >= 100) { s += GEM_H[Math.floor(n / 100)]; n %= 100; }
+  if (n === 15) s += 'טו'; else if (n === 16) s += 'טז'; else s += GEM_T[Math.floor(n / 10)] + GEM_U[n % 10];
+  return s.length > 1 ? s.slice(0, -1) + '״' + s.slice(-1) : s + '׳';
+}
+const HEB_FMT = new Intl.DateTimeFormat('he-u-ca-hebrew', {day:'numeric', month:'long', year:'numeric'});
+const dateOf = v => typeof v === 'number' ? new Date(v) : new Date(v + 'T12:00:00');
+// Hebrew date, e.g. "י״ד בחשוון" (withYear adds "תשפ״ז")
+function hebDate(v, withYear) {
+  const p = Object.fromEntries(HEB_FMT.formatToParts(dateOf(v)).map(x => [x.type, x.value]));
+  const m = p.month.replace(/^ב/, '');
+  return gematria(+p.day) + ' ב' + m + (withYear ? ' ' + gematria(+p.relatedYear || +p.year, true) : '');
+}
+const gregShort = v => dateOf(v).toLocaleDateString('he-IL', {day:'numeric', month:'short'});
+const addDays = (str, n) => { const d = new Date(str + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); };
 function dueText(due) {
   if (!due) return '';
   const diff = Math.round((new Date(due) - new Date(todayStr())) / 864e5);
-  if (diff === 0) return 'היום';
-  if (diff === 1) return 'מחר';
-  if (diff === -1) return 'אתמול';
-  return new Date(due).toLocaleDateString('he-IL', {day:'numeric', month:'short'});
+  const rel = diff === 0 ? 'היום' : diff === 1 ? 'מחר' : diff === -1 ? 'אתמול' : '';
+  return rel ? `${rel}<span class="g">${hebDate(due)}</span>` : `${hebDate(due)}<span class="g">${gregShort(due)}</span>`;
 }
-const fmtTs = ts => new Date(ts).toLocaleString('he-IL', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit'});
+const fmtTs = ts => hebDate(ts) + ' · ' + new Date(ts).toLocaleTimeString('he-IL', {hour:'2-digit', minute:'2-digit'});
 const noteType = id => NOTE_TYPES.find(n => n.id === id) || NOTE_TYPES[0];
 const isLight = c => LIGHT.includes(c);
 function exportBackup() {
@@ -494,13 +521,14 @@ function cardHTML(t) {
       ${true ? `<div class="meta">${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>${late ? '<button class="snooze" data-act="snooze">דחה למחר</button>' : ''}` : ''}${noteBtn(t)}</div>` : ''}
     </div>${starBtn(t)}</article>`;
 }
-function listRow(t) {
+function listRow(t, fx) {
   const urg = optOf('urgency', t.f.urgency);
   const tags = S.fields.slice(1).map(f => { const o = optOf(f.id, t.f[f.id]); return o ? `<span class="tag" style="--c:${o.color}" title="${esc(f.name)}"><i></i>${esc(o.label)}</span>` : ''; }).join('');
   const last = t.notes[t.notes.length - 1], nt = last && noteType(last.type);
   const late = t.due && t.due < todayStr() && t.status !== 'done';
   const st = STATUS.find(s => s.id === t.status);
-  return `<article class="card ${t.status === 'done' ? 'is-done' : ''}" data-id="${t.id}" style="--u:${urg ? urg.color : '#cfd5e1'}" tabindex="0">
+  const dd = t.dayDone === todayStr();
+  return `<article class="card ${t.status === 'done' ? 'is-done' : ''} ${fx && dd ? 'daydone' : ''}" data-id="${t.id}" style="--u:${urg ? urg.color : '#cfd5e1'}" tabindex="0">
     <button class="check" data-act="toggle" data-s="${t.status}" style="--c:${st.c}" aria-label="סימון כבוצע">${ICON.check}</button>
     <div class="cbody">
       <div><h3 class="ttl">${esc(t.title)}</h3>
@@ -509,6 +537,7 @@ function listRow(t) {
       <div>
         ${peekHTML(t)}
         <div class="meta" style="margin-top:${last ? 8 : 0}px"><button class="statusbtn" data-act="cycle" style="--c:${st.c}" title="לחיצה משנה סטטוס">${st.label}</button>${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>${late ? '<button class="snooze" data-act="snooze">דחה למחר</button>' : ''}` : ''}${noteBtn(t)}</div>
+        ${fx ? `<div class="fx"><button class="fxb ${dd ? 'on' : ''}" data-act="daydone" aria-pressed="${dd}">${dd ? '✓ ' : ''}סיימתי להיום</button><button class="fxb" data-act="tomorrow">העבר למחר</button></div>` : ''}
       </div>
     </div>${starBtn(t)}</article>`;
 }
@@ -536,17 +565,23 @@ function renderHints() {
     ? `<div class="softnote">${hot} מתוך ${open.length} משימות פתוחות מסומנות דחופות. כשהכול דחוף, הסימון מפסיק לעזור לבחור. כדאי לשמור אותו למה שבאמת לא יכול לחכות.</div>` : '';
 }
 function renderFocus() {
-  const el = $('#focusPage'), today = todayStr(), open = S.tasks.filter(t => t.status !== 'done');
-  const picked = open.filter(t => t.focus).sort((a, b) => urgRank(a) - urgRank(b));
+  const el = $('#focusPage'), today = todayStr(), tmr = addDays(today, 1), open = S.tasks.filter(t => t.status !== 'done');
+  const picked = open.filter(t => t.focus && (!t.focusFor || t.focusFor <= today)).sort((a, b) => (a.dayDone === today) - (b.dayDone === today) || urgRank(a) - urgRank(b));
+  const later = open.filter(t => t.focus && t.focusFor > today);
+  const handled = open.filter(t => t.dayDone === today && !t.focus);
+  const left = picked.filter(t => t.dayDone !== today).length;
   const due = open.filter(t => !t.focus && t.due && t.due <= today);
   const follow = open.map(t => ({t, n: t.notes.filter(n => n.type === 'wait' && n.follow && n.follow <= today).pop()})).filter(x => x.n && !x.t.focus && !due.includes(x.t));
   const dayStr = new Date().toDateString();
   const doneToday = S.tasks.filter(t => t.doneAt && new Date(t.doneAt).toDateString() === dayStr);
-  const rows = ts => `<div class="list">${ts.map(listRow).join('')}</div>`;
+  const rows = (ts, fx) => `<div class="list">${ts.map(t => listRow(t, fx)).join('')}</div>`;
   el.innerHTML = `<div class="phd"><h2>מה עושים היום</h2></div><div class="fgrid">
-    <p class="hint" style="margin-bottom:12px">בחרו כמה משימות להתמקד בהן היום, בלחיצה על הכוכב. רשימה קצרה קל יותר להתחיל ממנה.</p>
+    <p class="hint" style="margin-bottom:12px">בחרו כמה משימות להתמקד בהן היום, בלחיצה על הכוכב. בסוף היום סמנו "סיימתי להיום" על מה שעשיתם, והעבירו את השאר למחר.</p>
     ${picked.length > FOCUS_SOFT_CAP ? `<div class="softnote">בחרתם ${picked.length} משימות. עד ${FOCUS_SOFT_CAP} לרוב קל לסיים, אבל זו החלטה שלכם.</div>` : ''}
-    ${picked.length ? rows(picked) : `<div class="empty">עוד לא בחרתם משימות להיום. לחצו על הכוכב ליד משימה כדי להוסיף אותה לכאן.</div>`}
+    ${picked.length ? rows(picked, true) : `<div class="empty">עוד לא בחרתם משימות להיום. לחצו על הכוכב ליד משימה כדי להוסיף אותה לכאן.</div>`}
+    ${picked.length ? `<div class="wrapday"><button class="btn primary" data-wrapday>סיום היום: ${left ? `העבר ${left === 1 ? 'משימה אחת' : left + ' משימות'} למחר` : 'נקה את הרשימה'}</button><span class="hint">משימות שסומנו "סיימתי להיום" יוצאות מהרשימה, והשאר עוברות למחר (${hebDate(tmr)}).</span></div>` : ''}
+    ${later.length ? `<div class="fsec"><h3>מתוכננות למחר (${later.length})</h3>${rows(later)}</div>` : ''}
+    ${handled.length ? `<div class="fsec"><h3>סיימתי להיום (${handled.length})</h3><p class="hint">המשימות עדיין פתוחות, אבל עשיתם מה שרציתם היום.</p>${rows(handled)}</div>` : ''}
     ${due.length ? `<div class="fsec"><h3>הגיע המועד שלהן</h3><p class="hint">משימות עם תאריך יעד של היום או קודם. אפשר לבחור, לדחות או לוותר.</p>${rows(due)}</div>` : ''}
     ${follow.length ? `<div class="fsec"><h3>הגיע הזמן לחזור אליהם</h3><p class="hint">משימות שממתינות למישהו, ותאריך המעקב שקבעתם הגיע.</p>${rows(follow.map(x => x.t))}</div>` : ''}
     ${doneToday.length ? `<div class="fsec"><h3>הושלמו היום (${doneToday.length})</h3>${rows(doneToday)}</div>` : ''}
@@ -583,7 +618,7 @@ function drawTask() {
       <div><span class="lbl">סטטוס</span><div class="stseg">${STATUS.map(s => `<button type="button" data-status="${s.id}" style="--c:${s.c}" aria-pressed="${draft.status === s.id}"><i></i>${s.label}</button>`).join('')}</div></div>
       ${chipGroup(S.fields[0])}
       ${S.projects.length ? `<div><span class="lbl">פרויקט</span><div class="chips">${S.projects.map(p => `<button type="button" class="chip" style="--c:${p.color}" data-projpick="${p.id}" aria-pressed="${draft.project === p.id}"><i></i>${esc(p.name)}</button>`).join('')}</div></div>` : ''}
-      <div><label class="lbl" for="fDue">תאריך יעד</label><div style="display:flex;gap:8px"><input id="fDue" type="date" class="in" style="max-width:220px" value="${draft.due}">${draft.due ? '<button type="button" class="btn ghost" data-nodue>הסר תאריך</button>' : ''}</div></div>
+      <div><label class="lbl" for="fDue">תאריך יעד</label><div style="display:flex;gap:8px"><input id="fDue" type="date" class="in" style="max-width:220px" value="${draft.due}">${draft.due ? `<span class="hebin">${hebDate(draft.due, true)}</span><button type="button" class="btn ghost" data-nodue>הסר תאריך</button>` : ''}</div></div>
       ${S.fields.slice(1).map(chipGroup).join('')}
     </div>
     <div class="sheet-f">
@@ -743,7 +778,9 @@ function handleCard(e) {
   const gp = e.target.closest('[data-goproj]');
   if (gp) { ui.pid = gp.dataset.goproj; setPage('projects'); window.scrollTo(0, 0); return; }
   if (act === 'note') { openQN(t.id); return; }
-  if (act === 'focus') { t.focus = !t.focus; save(); renderAll(); toast(t.focus ? 'נוסף למיקוד היום' : 'הוסר ממיקוד היום'); return; }
+  if (act === 'daydone') { t.dayDone = t.dayDone === todayStr() ? '' : todayStr(); save(); renderAll(); toast(t.dayDone ? 'סומן: סיימתי להיום' : 'הסימון הוסר'); return; }
+  if (act === 'tomorrow') { t.focus = true; t.focusFor = addDays(todayStr(), 1); delete t.dayDone; save(); renderAll(); toast('הועבר למחר'); return; }
+  if (act === 'focus') { t.focus = !t.focus; if (t.focus) t.focusFor = todayStr(); else { delete t.focusFor; delete t.dayDone; } save(); renderAll(); toast(t.focus ? 'נוסף למיקוד היום' : 'הוסר ממיקוד היום'); return; }
   if (act === 'snooze') { const d = new Date(todayStr()); d.setDate(d.getDate() + 1); t.due = d.toISOString().slice(0, 10); save(); renderAll(); toast('נדחה למחר'); return; }
   if (act === 'toggle') { setStatus(t, t.status === 'done' ? 'todo' : 'done'); toast(t.status === 'done' ? 'סומן כבוצע' : 'הוחזר ללא בוצע'); }
   else if (act === 'cycle') setStatus(t, STATUS[(STATUS.findIndex(s => s.id === t.status) + 1) % 3].id);
@@ -752,7 +789,16 @@ function handleCard(e) {
 const cardKey = e => { if (e.key === 'Enter' && e.target.classList.contains('card')) openTask(e.target.dataset.id); };
 $('#main').addEventListener('click', handleCard);
 $('#main').addEventListener('keydown', cardKey);
-$('#focusPage').addEventListener('click', handleCard);
+$('#focusPage').addEventListener('click', e => {
+  if (!e.target.closest('[data-wrapday]')) return handleCard(e);
+  const today = todayStr(), tmr = addDays(today, 1);
+  let moved = 0;
+  S.tasks.forEach(t => {
+    if (t.status === 'done' || !t.focus || (t.focusFor && t.focusFor > today)) return;
+    if (t.dayDone === today) { t.focus = false; delete t.focusFor; } else { t.focusFor = tmr; moved++; }
+  });
+  save(); renderAll(); toast(moved ? 'השאר הועברו למחר' : 'היום נסגר');
+});
 $('#focusPage').addEventListener('keydown', cardKey);
 
 /* ---------- projects ---------- */
@@ -897,8 +943,13 @@ $('#main').addEventListener('dragend', () => { dragId = null; document.querySele
 $('#main').addEventListener('dragover', e => { const col = e.target.closest('.col'); if (!col || !dragId) return; e.preventDefault(); document.querySelectorAll('.col.over').forEach(x => x !== col && x.classList.remove('over')); col.classList.add('over'); });
 $('#main').addEventListener('drop', e => { const col = e.target.closest('.col'); if (!col || !dragId) return; e.preventDefault(); const t = S.tasks.find(x => x.id === dragId); if (t && t.status !== col.dataset.col) setStatus(t, col.dataset.col); else renderMain(); });
 
-$('#today').textContent = new Date().toLocaleDateString('he-IL', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+function renderToday() {
+  const n = new Date();
+  $('#today').innerHTML = `${n.toLocaleDateString('he-IL', {weekday:'long'})}, ${hebDate(Date.now(), true)}<span class="g">${n.toLocaleDateString('he-IL', {day:'numeric', month:'long', year:'numeric'})}</span>`;
+}
+renderToday();
 renderAll();
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderToday(); renderAll(); } });
 if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>

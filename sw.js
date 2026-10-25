@@ -1,5 +1,5 @@
 // Offline cache: serve the app from cache, refresh it in the background.
-const CACHE = 'tasks-v6';
+const CACHE = 'tasks-v7';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
