@@ -1,9 +1,9 @@
-// Offline cache: serve the app from cache, refresh it in the background.
-const CACHE = 'tasks-v7';
+// Offline cache: network first (always the latest version when online), cache as the offline fallback.
+const CACHE = 'tasks-v8';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)).then(() => self.skipWaiting()));
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE.map(u => new Request(u, {cache: 'reload'})))).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
@@ -11,8 +11,14 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
   e.respondWith(caches.open(CACHE).then(async cache => {
-    const hit = await cache.match(e.request, {ignoreSearch: true});
-    const net = fetch(e.request).then(res => { if (res.ok || res.type === 'opaque') cache.put(e.request, res.clone()); return res; }).catch(() => hit);
-    return hit || net;
+    try {
+      const res = await fetch(e.request, {cache: 'no-cache'});
+      if (res.ok || res.type === 'opaque') cache.put(e.request, res.clone());
+      return res;
+    } catch (err) {
+      const hit = await cache.match(e.request, {ignoreSearch: true});
+      if (hit) return hit;
+      throw err;
+    }
   }));
 });

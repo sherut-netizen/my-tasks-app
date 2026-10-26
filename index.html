@@ -950,7 +950,15 @@ function renderToday() {
 renderToday();
 renderAll();
 document.addEventListener('visibilitychange', () => { if (!document.hidden) { renderToday(); renderAll(); } });
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) {
+  // When a new version takes over, reload once so it shows right away.
+  const hadSW = !!navigator.serviceWorker.controller; let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (hadSW && !reloaded && !document.querySelector('.scrim.open')) { reloaded = true; location.reload(); } });
+  navigator.serviceWorker.register('sw.js').then(r => {
+    r.update().catch(() => {});
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) r.update().catch(() => {}); });
+  }).catch(() => {});
+}
 </script>
 </body>
 </html>
