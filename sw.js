@@ -1,5 +1,5 @@
 // Offline cache: network first (always the latest version when online), cache as the offline fallback.
-const CACHE = 'tasks-v9';
+const CACHE = 'tasks-v10';
 const CORE = ['./', './index.html', './manifest.webmanifest', './icon.svg', './icon-192.png', './icon-512.png'];
 
 self.addEventListener('install', e => {

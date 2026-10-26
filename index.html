@@ -429,6 +429,7 @@ const hasFilter = () => !!(ui.q || ui.proj || ui.ntype || ui.status !== 'all' ||
 const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6-4.5-4.2 6.1-.8z"/></svg>';
 const STARO = STAR.replace('fill="currentColor"', 'fill="none"');
 const FOCUS_SOFT_CAP = 3, WIP_SOFT_CAP = 3;
+const tmrBtn = t => t.status === 'done' ? '' : '<button class="snooze" data-act="tomorrow" title="להעביר את המשימה ליום מחר">העבר למחר</button>';
 const noteBtn = t => `<button class="addnote" data-act="note" title="הוספת הערה">${ICON.chat}${t.notes.length ? (t.notes.length === 1 ? 'הערה אחת' : t.notes.length + ' הערות') : 'הוסף הערה'}</button>`;
 function peekHTML(t) {
   return t.notes.slice(-2).reverse().map(n => { const ty = noteType(n.type); return `<div class="note-peek" style="--nc:${ty.c}"><b>${ty.label}</b><span>${esc(n.text)}${n.follow ? ` (לחזור: ${dueText(n.follow)})` : ''}</span></div>`; }).join('');
@@ -631,7 +632,7 @@ function cardHTML(t) {
       ${t.next && t.status !== 'done' ? `<div class="next"><b>הצעד הבא</b><span>${esc(t.next)}</span></div>` : ''}
       <div class="tags">${urg ? `<span class="pill urg ${isLight(urg.color) ? 'light' : ''}" style="--c:${urg.color}">${esc(urg.label)}</span>` : ''}${projTag(t)}${tags}</div>
       ${peekHTML(t)}
-      ${true ? `<div class="meta">${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>${late ? '<button class="snooze" data-act="snooze">דחה למחר</button>' : ''}` : ''}${noteBtn(t)}</div>` : ''}
+      ${true ? `<div class="meta">${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>` : ''}${tmrBtn(t)}${noteBtn(t)}</div>` : ''}
     </div>${starBtn(t)}</article>`;
 }
 function listRow(t, fx) {
@@ -649,7 +650,7 @@ function listRow(t, fx) {
         <div class="tags" style="margin-top:6px">${urg ? `<span class="pill urg ${isLight(urg.color) ? 'light' : ''}" style="--c:${urg.color}">${esc(urg.label)}</span>` : ''}${projTag(t)}${tags}</div></div>
       <div>
         ${peekHTML(t)}
-        <div class="meta" style="margin-top:${last ? 8 : 0}px"><button class="statusbtn" data-act="cycle" style="--c:${st.c}" title="לחיצה משנה סטטוס">${st.label}</button>${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>${late ? '<button class="snooze" data-act="snooze">דחה למחר</button>' : ''}` : ''}${noteBtn(t)}</div>
+        <div class="meta" style="margin-top:${last ? 8 : 0}px"><button class="statusbtn" data-act="cycle" style="--c:${st.c}" title="לחיצה משנה סטטוס">${st.label}</button>${t.due ? `<span class="${late ? 'late' : ''}">${ICON.cal}${dueText(t.due)}${late ? ' - עבר התאריך' : ''}</span>` : ''}${fx ? '' : tmrBtn(t)}${noteBtn(t)}</div>
         ${fx ? `<div class="fx"><button class="fxb ${dd ? 'on' : ''}" data-act="daydone" aria-pressed="${dd}">${dd ? '✓ ' : ''}סיימתי להיום</button><button class="fxb" data-act="tomorrow">העבר למחר</button></div>` : ''}
       </div>
     </div>${starBtn(t)}</article>`;
@@ -695,8 +696,8 @@ function renderFocus() {
     ${picked.length ? `<div class="wrapday"><button class="btn primary" data-wrapday>סיום היום: ${left ? `העבר ${left === 1 ? 'משימה אחת' : left + ' משימות'} למחר` : 'נקה את הרשימה'}</button><span class="hint">משימות שסומנו "סיימתי להיום" יוצאות מהרשימה, והשאר עוברות למחר (${hebDate(tmr)}).</span></div>` : ''}
     ${later.length ? `<div class="fsec"><h3>מתוכננות למחר (${later.length})</h3>${rows(later)}</div>` : ''}
     ${handled.length ? `<div class="fsec"><h3>סיימתי להיום (${handled.length})</h3><p class="hint">המשימות עדיין פתוחות, אבל עשיתם מה שרציתם היום.</p>${rows(handled)}</div>` : ''}
-    ${due.length ? `<div class="fsec"><h3>הגיע המועד שלהן</h3><p class="hint">משימות עם תאריך יעד של היום או קודם. אפשר לבחור, לדחות או לוותר.</p>${rows(due)}</div>` : ''}
-    ${follow.length ? `<div class="fsec"><h3>הגיע הזמן לחזור אליהם</h3><p class="hint">משימות שממתינות למישהו, ותאריך המעקב שקבעתם הגיע.</p>${rows(follow.map(x => x.t))}</div>` : ''}
+    ${due.length ? `<div class="fsec"><h3>הגיע המועד שלהן</h3><p class="hint">משימות עם תאריך יעד של היום או קודם. אפשר לבחור, לדחות או לוותר.</p>${rows(due, true)}</div>` : ''}
+    ${follow.length ? `<div class="fsec"><h3>הגיע הזמן לחזור אליהם</h3><p class="hint">משימות שממתינות למישהו, ותאריך המעקב שקבעתם הגיע.</p>${rows(follow.map(x => x.t), true)}</div>` : ''}
     ${doneToday.length ? `<div class="fsec"><h3>הושלמו היום (${doneToday.length})</h3>${rows(doneToday)}</div>` : ''}
   </div>`;
 }
@@ -892,9 +893,8 @@ function handleCard(e) {
   if (gp) { ui.pid = gp.dataset.goproj; setPage('projects'); window.scrollTo(0, 0); return; }
   if (act === 'note') { openQN(t.id); return; }
   if (act === 'daydone') { t.dayDone = t.dayDone === todayStr() ? '' : todayStr(); save(); renderAll(); toast(t.dayDone ? 'סומן: סיימתי להיום' : 'הסימון הוסר'); return; }
-  if (act === 'tomorrow') { t.focus = true; t.focusFor = addDays(todayStr(), 1); delete t.dayDone; save(); renderAll(); toast('הועבר למחר'); return; }
+  if (act === 'tomorrow') { const today = todayStr(), tmr = addDays(today, 1); t.focus = true; t.focusFor = tmr; delete t.dayDone; if (t.due && t.due <= today) t.due = tmr; save(); renderAll(); toast('הועבר למחר'); return; }
   if (act === 'focus') { t.focus = !t.focus; if (t.focus) t.focusFor = todayStr(); else { delete t.focusFor; delete t.dayDone; } save(); renderAll(); toast(t.focus ? 'נוסף למיקוד היום' : 'הוסר ממיקוד היום'); return; }
-  if (act === 'snooze') { const d = new Date(todayStr()); d.setDate(d.getDate() + 1); t.due = d.toISOString().slice(0, 10); save(); renderAll(); toast('נדחה למחר'); return; }
   if (act === 'toggle') { setStatus(t, t.status === 'done' ? 'todo' : 'done'); toast(t.status === 'done' ? 'סומן כבוצע' : 'הוחזר ללא בוצע'); }
   else if (act === 'cycle') setStatus(t, STATUS[(STATUS.findIndex(s => s.id === t.status) + 1) % 3].id);
   else openTask(t.id);
