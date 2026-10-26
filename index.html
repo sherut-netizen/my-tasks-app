@@ -429,7 +429,7 @@ const hasFilter = () => !!(ui.q || ui.proj || ui.ntype || ui.status !== 'all' ||
 const STAR = '<svg viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"><path d="m12 3 2.7 5.6 6.1.8-4.5 4.2 1.1 6-5.4-3-5.4 3 1.1-6-4.5-4.2 6.1-.8z"/></svg>';
 const STARO = STAR.replace('fill="currentColor"', 'fill="none"');
 const FOCUS_SOFT_CAP = 3, WIP_SOFT_CAP = 3;
-const tmrBtn = t => t.status === 'done' ? '' : '<button class="snooze" data-act="tomorrow" title="להעביר את המשימה ליום מחר">העבר למחר</button>';
+const tmrBtn = t => t.status === 'done' || t.due !== todayStr() ? '' : '<button class="snooze" data-act="tomorrow" title="להעביר את המשימה ליום מחר">העבר למחר</button>';
 const noteBtn = t => `<button class="addnote" data-act="note" title="הוספת הערה">${ICON.chat}${t.notes.length ? (t.notes.length === 1 ? 'הערה אחת' : t.notes.length + ' הערות') : 'הוסף הערה'}</button>`;
 function peekHTML(t) {
   return t.notes.slice(-2).reverse().map(n => { const ty = noteType(n.type); return `<div class="note-peek" style="--nc:${ty.c}"><b>${ty.label}</b><span>${esc(n.text)}${n.follow ? ` (לחזור: ${dueText(n.follow)})` : ''}</span></div>`; }).join('');
